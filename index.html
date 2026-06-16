@@ -16,7 +16,7 @@ body{
 
 /* glass toolbar */
 #topbar{
-    height:64px;
+    height:70px;
     display:flex;
     align-items:center;
     justify-content:center;
@@ -25,6 +25,7 @@ body{
     backdrop-filter: blur(12px);
     background:rgba(255,255,255,0.06);
     border-bottom:1px solid rgba(255,255,255,0.1);
+    flex-wrap:wrap;
 }
 
 button{
@@ -34,27 +35,30 @@ button{
     cursor:pointer;
     background:rgba(255,255,255,0.1);
     color:white;
-    backdrop-filter: blur(8px);
 }
 
 button:hover{
     background:rgba(255,255,255,0.2);
 }
 
-/* neon color dots */
+label{
+    font-size:12px;
+    opacity:0.8;
+}
+
+/* color dots */
 .color{
-    width:22px;
-    height:22px;
+    width:20px;
+    height:20px;
     border-radius:50%;
     cursor:pointer;
     border:2px solid rgba(255,255,255,0.6);
-    box-shadow:0 0 10px rgba(255,255,255,0.2);
 }
 
 canvas{
     display:block;
-    touch-action:none;
     background:white;
+    touch-action:none;
 }
 
 /* popup */
@@ -76,7 +80,6 @@ canvas{
     border-radius:14px;
     max-width:360px;
     text-align:center;
-    color:white;
 }
 </style>
 </head>
@@ -86,13 +89,12 @@ canvas{
 <!-- POPUP -->
 <div id="popup">
   <div id="popupBox">
-    <h2>Welcome 👋</h2>
+    <h2>Welcome ✨</h2>
     <p>
-      Keep it clean:<br><br>
+      Be respectful:<br><br>
       • No inappropriate content<br>
-      • No spam or abuse<br>
-      • Respect others<br><br>
-      Enjoy the shared neon board ✨
+      • No spam<br>
+      • Be kind<br>
     </p>
     <button onclick="closePopup()">Enter</button>
   </div>
@@ -103,13 +105,18 @@ canvas{
     <button onclick="setDraw()">✏️ Draw</button>
     <button onclick="setErase()">🧽 Erase</button>
 
+    <label>Brush</label>
+    <input type="range" id="brush" min="1" max="20" value="2">
+
+    <label>Eraser</label>
+    <input type="range" id="eraser" min="5" max="50" value="15">
+
     <div class="color" style="background:#ff004c" data-color="#ff004c"></div>
     <div class="color" style="background:#ff9900" data-color="#ff9900"></div>
     <div class="color" style="background:#ffee00" data-color="#ffee00"></div>
     <div class="color" style="background:#00ff88" data-color="#00ff88"></div>
     <div class="color" style="background:#00ccff" data-color="#00ccff"></div>
     <div class="color" style="background:#7a00ff" data-color="#7a00ff"></div>
-    <div class="color" style="background:#ffffff" data-color="#000000"></div>
 </div>
 
 <canvas id="canvas"></canvas>
@@ -127,7 +134,7 @@ import {
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
 
 const firebaseConfig = {
-  apiKey: "AIzaSyBED5YhUVswL69UQza4RYXixKufPxD_Iac",
+  apiKey: "AIzaSyBED5YHUVswL69UQza4RYXixKufPxD_Iac",
   authDomain: "project-7656380588312547449.firebaseapp.com",
   databaseURL: "https://project-7656380588312547449-default-rtdb.firebaseio.com",
   projectId: "project-7656380588312547449",
@@ -145,7 +152,7 @@ const ctx = canvas.getContext("2d");
 
 function resize(){
     canvas.width = window.innerWidth;
-    canvas.height = window.innerHeight - 64;
+    canvas.height = window.innerHeight - 70;
 }
 window.addEventListener("resize",resize);
 resize();
@@ -156,11 +163,22 @@ window.closePopup = () => {
 };
 
 /* tools */
-let mode = "draw";
-let color = "#ff004c";
+let mode="draw";
+let color="#ff004c";
 
-window.setDraw = () => mode = "draw";
-window.setErase = () => mode = "erase";
+let brushSize=2;
+let eraserSize=15;
+
+document.getElementById("brush").oninput=(e)=>{
+    brushSize=Number(e.target.value);
+};
+
+document.getElementById("eraser").oninput=(e)=>{
+    eraserSize=Number(e.target.value);
+};
+
+window.setDraw=()=>mode="draw";
+window.setErase=()=>mode="erase";
 
 /* colors */
 document.querySelectorAll(".color").forEach(c=>{
@@ -173,27 +191,25 @@ document.querySelectorAll(".color").forEach(c=>{
 let drawing=false;
 let lastX,lastY;
 
-/* real eraser mode (IMPORTANT FIX) */
-function applyStrokeStyle(){
-    if(mode === "erase"){
-        ctx.globalCompositeOperation = "destination-out";
-        ctx.lineWidth = 10; // nice eraser size
-    }else{
-        ctx.globalCompositeOperation = "source-over";
-        ctx.lineWidth = 2;
-    }
+/* real draw/erase */
+function applyMode(){
+    ctx.globalCompositeOperation =
+        mode==="erase" ? "destination-out" : "source-over";
+
+    ctx.lineWidth =
+        mode==="erase" ? eraserSize : brushSize;
+
+    ctx.lineCap="round";
+    ctx.lineJoin="round";
 }
 
 function drawLine(d){
-    applyStrokeStyle();
+    applyMode();
 
     ctx.beginPath();
     ctx.moveTo(d.x1,d.y1);
     ctx.lineTo(d.x2,d.y2);
-
-    ctx.strokeStyle = d.color;
-    ctx.lineCap = "round";
-    ctx.lineJoin = "round";
+    ctx.strokeStyle=d.color;
     ctx.stroke();
 }
 
@@ -220,16 +236,23 @@ function move(e){
 
     const p=pos(e);
 
-    const stroke = {
+    push(ref(db,"strokes"),{
+        x1:lastX,
+        y1:lastY,
+        x2:p.x,
+        y2:p.y,
+        color:color,
+        mode:mode,
+        size: mode==="erase"?eraserSize:brushSize
+    });
+
+    drawLine({
         x1:lastX,
         y1:lastY,
         x2:p.x,
         y2:p.y,
         color:color
-    };
-
-    drawLine(stroke);
-    push(ref(db,"strokes"),stroke);
+    });
 
     lastX=p.x;
     lastY=p.y;
@@ -249,11 +272,24 @@ window.addEventListener("touchend",stop);
 
 /* realtime */
 onChildAdded(ref(db,"strokes"),snap=>{
-    drawLine(snap.val());
+    const d=snap.val();
+
+    ctx.globalCompositeOperation =
+        d.mode==="erase" ? "destination-out" : "source-over";
+
+    ctx.lineWidth=d.size || 2;
+
+    ctx.beginPath();
+    ctx.moveTo(d.x1,d.y1);
+    ctx.lineTo(d.x2,d.y2);
+    ctx.strokeStyle=d.color;
+    ctx.lineCap="round";
+    ctx.lineJoin="round";
+    ctx.stroke();
 });
 
 /* hourly reset */
-const hourRef = ref(db,"hourBucket");
+const hourRef=ref(db,"hourBucket");
 
 async function checkReset(){
     const h=Math.floor(Date.now()/3600000);
