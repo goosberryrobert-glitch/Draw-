@@ -8,7 +8,7 @@
 <style>
 body{
     margin:0;
-    font-family:Arial,sans-serif;
+    font-family:Arial;
     background:#111;
     overflow:hidden;
 }
@@ -23,12 +23,19 @@ body{
     flex-wrap:wrap;
 }
 
-.color{
-    width:28px;
-    height:28px;
-    border-radius:50%;
+button{
+    padding:6px 10px;
+    border:none;
+    border-radius:6px;
     cursor:pointer;
+}
+
+.color{
+    width:26px;
+    height:26px;
+    border-radius:50%;
     border:2px solid white;
+    cursor:pointer;
 }
 
 canvas{
@@ -37,13 +44,10 @@ canvas{
     touch-action:none;
 }
 
-/* POPUP */
+/* popup */
 #popup{
     position:fixed;
-    top:0;
-    left:0;
-    width:100%;
-    height:100%;
+    inset:0;
     background:rgba(0,0,0,0.85);
     display:flex;
     align-items:center;
@@ -53,52 +57,39 @@ canvas{
 
 #popupBox{
     background:white;
-    color:black;
     padding:20px;
-    border-radius:12px;
+    border-radius:10px;
     max-width:400px;
     text-align:center;
-}
-
-#popup button{
-    margin-top:10px;
-    padding:10px 15px;
-    border:none;
-    background:#111;
-    color:white;
-    border-radius:8px;
-    cursor:pointer;
 }
 </style>
 </head>
 
 <body>
 
-<!-- POPUP -->
+<!-- RULE POPUP -->
 <div id="popup">
   <div id="popupBox">
-    <h2>Welcome 👋</h2>
+    <h2>Rules</h2>
     <p>
-      Please keep this drawing board clean:<br><br>
-      • No swearing<br>
-      • No inappropriate drawings<br>
-      • No spam or harassment<br><br>
+      No swearing, inappropriate drawings, or spam.<br>
       Be respectful so everyone can enjoy it.
     </p>
     <button onclick="closePopup()">I Understand</button>
   </div>
 </div>
 
+<!-- TOOLBAR -->
 <div id="topbar">
+    <button onclick="setDraw()">✏️ Draw</button>
+    <button onclick="setEraser()">🧽 Eraser</button>
+
     <div class="color" style="background:black" data-color="#000000"></div>
     <div class="color" style="background:red" data-color="#ff0000"></div>
     <div class="color" style="background:orange" data-color="#ff8800"></div>
     <div class="color" style="background:yellow" data-color="#ffff00"></div>
     <div class="color" style="background:green" data-color="#00cc00"></div>
-    <div class="color" style="background:cyan" data-color="#00ffff"></div>
     <div class="color" style="background:blue" data-color="#0066ff"></div>
-    <div class="color" style="background:purple" data-color="#aa00ff"></div>
-    <div class="color" style="background:pink" data-color="#ff55aa"></div>
 </div>
 
 <canvas id="canvas"></canvas>
@@ -142,15 +133,22 @@ window.addEventListener("resize",resize);
 resize();
 
 /* popup */
-window.closePopup = function(){
+window.closePopup = () => {
     document.getElementById("popup").style.display="none";
 };
 
-let currentColor="#000000";
+/* tool state */
+let mode = "draw"; // draw or erase
+let color = "#000000";
 
-document.querySelectorAll(".color").forEach(btn=>{
-    btn.onclick=()=>{
-        currentColor=btn.dataset.color;
+window.setDraw = () => mode = "draw";
+window.setEraser = () => mode = "erase";
+
+/* colors */
+document.querySelectorAll(".color").forEach(c=>{
+    c.onclick=()=>{
+        color=c.dataset.color;
+        mode="draw";
     };
 });
 
@@ -172,7 +170,7 @@ function drawLine(d){
     ctx.moveTo(d.x1,d.y1);
     ctx.lineTo(d.x2,d.y2);
     ctx.strokeStyle=d.color;
-    ctx.lineWidth=2;   // 🔥 thinner lines
+    ctx.lineWidth=2;
     ctx.lineCap="round";
     ctx.stroke();
 }
@@ -190,12 +188,12 @@ function move(e){
 
     const p=pos(e);
 
-    const line={
+    const line = {
         x1:lastX,
         y1:lastY,
         x2:p.x,
         y2:p.y,
-        color:currentColor
+        color: (mode === "erase") ? "#ffffff" : color
     };
 
     drawLine(line);
@@ -226,12 +224,12 @@ onChildAdded(ref(db,"strokes"),snap=>{
 const hourRef = ref(db,"hourBucket");
 
 async function checkHourReset(){
-    const currentHour=Math.floor(Date.now()/3600000);
+    const h=Math.floor(Date.now()/3600000);
     const snap=await get(hourRef);
 
-    if(!snap.exists() || snap.val()!==currentHour){
+    if(!snap.exists() || snap.val()!==h){
         await set(ref(db,"strokes"),null);
-        await set(hourRef,currentHour);
+        await set(hourRef,h);
         location.reload();
     }
 }
