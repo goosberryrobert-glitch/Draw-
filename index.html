@@ -3,45 +3,58 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Shared Drawing Board</title>
+<title>Neon Draw Board</title>
 
 <style>
 body{
     margin:0;
-    font-family:Arial;
-    background:#111;
     overflow:hidden;
+    font-family:Arial;
+    background:radial-gradient(circle at top,#0f0f1a,#050510);
+    color:white;
 }
 
+/* glass toolbar */
 #topbar{
-    height:60px;
-    background:#222;
+    height:64px;
     display:flex;
     align-items:center;
     justify-content:center;
     gap:10px;
-    flex-wrap:wrap;
+    padding:8px;
+    backdrop-filter: blur(12px);
+    background:rgba(255,255,255,0.06);
+    border-bottom:1px solid rgba(255,255,255,0.1);
 }
 
 button{
     padding:6px 10px;
     border:none;
-    border-radius:6px;
+    border-radius:10px;
     cursor:pointer;
+    background:rgba(255,255,255,0.1);
+    color:white;
+    backdrop-filter: blur(8px);
 }
 
+button:hover{
+    background:rgba(255,255,255,0.2);
+}
+
+/* neon color dots */
 .color{
-    width:26px;
-    height:26px;
+    width:22px;
+    height:22px;
     border-radius:50%;
-    border:2px solid white;
     cursor:pointer;
+    border:2px solid rgba(255,255,255,0.6);
+    box-shadow:0 0 10px rgba(255,255,255,0.2);
 }
 
 canvas{
     display:block;
-    background:white;
     touch-action:none;
+    background:white;
 }
 
 /* popup */
@@ -56,40 +69,47 @@ canvas{
 }
 
 #popupBox{
-    background:white;
+    background:rgba(255,255,255,0.1);
+    backdrop-filter: blur(12px);
+    border:1px solid rgba(255,255,255,0.2);
     padding:20px;
-    border-radius:10px;
-    max-width:400px;
+    border-radius:14px;
+    max-width:360px;
     text-align:center;
+    color:white;
 }
 </style>
 </head>
 
 <body>
 
-<!-- RULE POPUP -->
+<!-- POPUP -->
 <div id="popup">
   <div id="popupBox">
-    <h2>Rules</h2>
+    <h2>Welcome 👋</h2>
     <p>
-      No swearing, inappropriate drawings, or spam.<br>
-      Be respectful so everyone can enjoy it.
+      Keep it clean:<br><br>
+      • No inappropriate content<br>
+      • No spam or abuse<br>
+      • Respect others<br><br>
+      Enjoy the shared neon board ✨
     </p>
-    <button onclick="closePopup()">I Understand</button>
+    <button onclick="closePopup()">Enter</button>
   </div>
 </div>
 
 <!-- TOOLBAR -->
 <div id="topbar">
     <button onclick="setDraw()">✏️ Draw</button>
-    <button onclick="setEraser()">🧽 Eraser</button>
+    <button onclick="setErase()">🧽 Erase</button>
 
-    <div class="color" style="background:black" data-color="#000000"></div>
-    <div class="color" style="background:red" data-color="#ff0000"></div>
-    <div class="color" style="background:orange" data-color="#ff8800"></div>
-    <div class="color" style="background:yellow" data-color="#ffff00"></div>
-    <div class="color" style="background:green" data-color="#00cc00"></div>
-    <div class="color" style="background:blue" data-color="#0066ff"></div>
+    <div class="color" style="background:#ff004c" data-color="#ff004c"></div>
+    <div class="color" style="background:#ff9900" data-color="#ff9900"></div>
+    <div class="color" style="background:#ffee00" data-color="#ffee00"></div>
+    <div class="color" style="background:#00ff88" data-color="#00ff88"></div>
+    <div class="color" style="background:#00ccff" data-color="#00ccff"></div>
+    <div class="color" style="background:#7a00ff" data-color="#7a00ff"></div>
+    <div class="color" style="background:#ffffff" data-color="#000000"></div>
 </div>
 
 <canvas id="canvas"></canvas>
@@ -125,9 +145,7 @@ const ctx = canvas.getContext("2d");
 
 function resize(){
     canvas.width = window.innerWidth;
-    canvas.height = window.innerHeight - 60;
-    ctx.fillStyle="white";
-    ctx.fillRect(0,0,canvas.width,canvas.height);
+    canvas.height = window.innerHeight - 64;
 }
 window.addEventListener("resize",resize);
 resize();
@@ -137,12 +155,12 @@ window.closePopup = () => {
     document.getElementById("popup").style.display="none";
 };
 
-/* tool state */
-let mode = "draw"; // draw or erase
-let color = "#000000";
+/* tools */
+let mode = "draw";
+let color = "#ff004c";
 
 window.setDraw = () => mode = "draw";
-window.setEraser = () => mode = "erase";
+window.setErase = () => mode = "erase";
 
 /* colors */
 document.querySelectorAll(".color").forEach(c=>{
@@ -155,6 +173,30 @@ document.querySelectorAll(".color").forEach(c=>{
 let drawing=false;
 let lastX,lastY;
 
+/* real eraser mode (IMPORTANT FIX) */
+function applyStrokeStyle(){
+    if(mode === "erase"){
+        ctx.globalCompositeOperation = "destination-out";
+        ctx.lineWidth = 10; // nice eraser size
+    }else{
+        ctx.globalCompositeOperation = "source-over";
+        ctx.lineWidth = 2;
+    }
+}
+
+function drawLine(d){
+    applyStrokeStyle();
+
+    ctx.beginPath();
+    ctx.moveTo(d.x1,d.y1);
+    ctx.lineTo(d.x2,d.y2);
+
+    ctx.strokeStyle = d.color;
+    ctx.lineCap = "round";
+    ctx.lineJoin = "round";
+    ctx.stroke();
+}
+
 function pos(e){
     const r=canvas.getBoundingClientRect();
     const t=e.touches?e.touches[0]:e;
@@ -163,16 +205,6 @@ function pos(e){
         x:t.clientX-r.left,
         y:t.clientY-r.top
     };
-}
-
-function drawLine(d){
-    ctx.beginPath();
-    ctx.moveTo(d.x1,d.y1);
-    ctx.lineTo(d.x2,d.y2);
-    ctx.strokeStyle=d.color;
-    ctx.lineWidth=2;
-    ctx.lineCap="round";
-    ctx.stroke();
 }
 
 function start(e){
@@ -188,16 +220,16 @@ function move(e){
 
     const p=pos(e);
 
-    const line = {
+    const stroke = {
         x1:lastX,
         y1:lastY,
         x2:p.x,
         y2:p.y,
-        color: (mode === "erase") ? "#ffffff" : color
+        color:color
     };
 
-    drawLine(line);
-    push(ref(db,"strokes"),line);
+    drawLine(stroke);
+    push(ref(db,"strokes"),stroke);
 
     lastX=p.x;
     lastY=p.y;
@@ -223,7 +255,7 @@ onChildAdded(ref(db,"strokes"),snap=>{
 /* hourly reset */
 const hourRef = ref(db,"hourBucket");
 
-async function checkHourReset(){
+async function checkReset(){
     const h=Math.floor(Date.now()/3600000);
     const snap=await get(hourRef);
 
@@ -234,8 +266,8 @@ async function checkHourReset(){
     }
 }
 
-checkHourReset();
-setInterval(checkHourReset,30000);
+checkReset();
+setInterval(checkReset,30000);
 
 </script>
 
